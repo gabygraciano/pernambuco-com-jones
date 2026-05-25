@@ -11,6 +11,7 @@ let activeCities = [];
 let allMunicipalities = [];
 let width = 0;
 let height = 0;
+let crabBase64 = "crab.png";
 
 // Seletores D3 e DOM
 const svg = d3.select("#map-svg");
@@ -56,6 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupDimensions();
   loadData();
   setupEventListeners();
+  loadCrabAsBase64();
 });
 
 // Configura as dimensões do SVG com base na tela
@@ -555,6 +557,12 @@ const cidadesDoadorasIniciais = ${JSON.stringify(activeCities, null, 2)};
     ghStatus.style.border = `1px solid ${color}`;
     ghStatus.style.display = "block";
   }
+
+  // Download do mapa como imagem
+  const downloadBtn = document.getElementById("download-map");
+  if (downloadBtn) {
+    downloadBtn.addEventListener("click", downloadMapAsImage);
+  }
 }
 
 // Configura o Autocomplete no Painel Admin
@@ -821,7 +829,7 @@ function updateCrabIcons(projection) {
   const enterCrabs = crabs.enter()
     .append("image")
     .attr("class", "crab-icon")
-    .attr("xlink:href", "crab.png")
+    .attr("xlink:href", crabBase64) // Usa base64 se disponível para evitar erros no Canvas
     .attr("pointer-events", "none"); // repassa os cliques para o path do mapa abaixo
     
   // Mescla novos e existentes e posiciona com compensação de zoom
@@ -841,4 +849,136 @@ function updateCrabIcons(projection) {
       const centroid = pathGenerator.centroid(d);
       return centroid[1] - (12 / scale);
     });
+}
+
+// Carrega a imagem do caranguejo e converte para Base64
+// Necessário para permitir a renderização no Canvas sem restrições de CORS
+function loadCrabAsBase64() {
+  fetch("crab.png")
+    .then((response) => response.blob())
+    .then((blob) => {
+      const reader = new FileReader();
+      reader.onloadend = function () {
+        crabBase64 = reader.result;
+        // Se o mapa já estiver desenhado, atualiza os caminhos das imagens
+        g.selectAll(".crab-icon").attr("xlink:href", crabBase64);
+      };
+      reader.readAsDataURL(blob);
+    })
+    .catch((err) => {
+      console.warn("Erro ao carregar imagem do caranguejo em Base64 para exportação:", err);
+    });
+}
+
+// Exporta o mapa interativo D3 como uma imagem PNG de alta resolução
+function downloadMapAsImage() {
+  const svgElement = document.getElementById("map-svg");
+  if (!svgElement) return;
+
+  const downloadBtn = document.getElementById("download-map");
+  const originalHTML = downloadBtn.innerHTML;
+  
+  // Efeito visual de carregamento no botão
+  downloadBtn.innerHTML = `
+    <svg class="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="animation: spin 1s linear infinite;">
+      <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+      <path d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z"></path>
+    </svg>
+  `;
+  downloadBtn.disabled = true;
+
+  // Injeta estilos css de animação no documento temporariamente se não existirem
+  if (!document.getElementById("spin-keyframes")) {
+    const style = document.createElement("style");
+    style.id = "spin-keyframes";
+    style.textContent = "@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }";
+    document.head.appendChild(style);
+  }
+
+  try {
+    // 1. Clona o elemento SVG
+    const clonedSvg = svgElement.cloneNode(true);
+    
+    // 2. Injeta estilos CSS específicos no SVG clonado para garantir as cores e bordas
+    const styleElement = document.createElement("style");
+    styleElement.textContent = `
+      .municipality {
+        fill: #FCC643; /* Amarelo base */
+        stroke: #213B81; /* Azul contorno */
+        stroke-width: 0.6px;
+      }
+      .municipality.donated-city {
+        fill: #E63337; /* Vermelho doadores */
+      }
+      .crab-icon {
+        pointer-events: none;
+      }
+    `;
+    clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
+
+    // 3. Define tamanho da imagem de saída em alta resolução (Full HD 1920px de largura)
+    const bbox = svgElement.getBoundingClientRect();
+    const exportWidth = 1920;
+    const exportHeight = (bbox.height / bbox.width) * exportWidth;
+
+    clonedSvg.setAttribute("width", exportWidth);
+    clonedSvg.setAttribute("height", exportHeight);
+    
+    // Ajusta o viewBox com base nas dimensões atuais calculadas dinamicamente
+    clonedSvg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+    // 4. Converte o SVG para string XML e cria a URL de objeto Blob
+    const svgString = new XMLSerializer().serializeToString(clonedSvg);
+    const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const URL = window.URL || window.webkitURL || window;
+    const blobURL = URL.createObjectURL(svgBlob);
+
+    // 5. Carrega o SVG em um elemento de imagem
+    const image = new Image();
+    image.onload = () => {
+      // 6. Desenha a imagem no Canvas
+      const canvas = document.createElement("canvas");
+      canvas.width = exportWidth;
+      canvas.height = exportHeight;
+      const context = canvas.getContext("2d");
+
+      // Pinta o fundo com o Azul oficial do projeto (#213B81)
+      context.fillStyle = "#213B81";
+      context.fillRect(0, 0, exportWidth, exportHeight);
+
+      // Desenha o mapa clonado por cima do fundo
+      context.drawImage(image, 0, 0, exportWidth, exportHeight);
+
+      // 7. Converte o canvas para imagem PNG e baixa
+      const pngURL = canvas.toDataURL("image/png");
+      const downloadLink = document.createElement("a");
+      downloadLink.href = pngURL;
+      downloadLink.download = "pernambuco-com-jones-mapa.png";
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+
+      // Limpa os recursos da memória
+      URL.revokeObjectURL(blobURL);
+      
+      // Restaura o botão
+      downloadBtn.innerHTML = originalHTML;
+      downloadBtn.disabled = false;
+    };
+
+    image.onerror = (err) => {
+      console.error("Erro na conversão do mapa:", err);
+      alert("Houve um erro ao processar a imagem do mapa.");
+      downloadBtn.innerHTML = originalHTML;
+      downloadBtn.disabled = false;
+    };
+
+    image.src = blobURL;
+
+  } catch (error) {
+    console.error("Erro na exportação da imagem:", error);
+    alert("Infelizmente seu navegador não suporta a exportação da imagem.");
+    downloadBtn.innerHTML = originalHTML;
+    downloadBtn.disabled = false;
+  }
 }
