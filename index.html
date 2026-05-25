@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pernambuco com Jones - Mapa Interativo</title>
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Acompanhe interativamente os municípios de Pernambuco que apoiam a vaquinha de Jones Manoel. Veja dados atualizados por cidade.">
+  <meta name="author" content="Jones Manoel Campanha">
+  <meta name="robots" content="index, follow">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- D3.js Library v7 (Necessária para a renderização do mapa dinâmico) -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- BARRA LATERAL (SIDEBAR) -->
+    <aside class="sidebar">
+      
+      <div class="sidebar-top">
+        <!-- Cabeçalho -->
+        <header class="sidebar-header">
+          <h1 id="main-title" class="sidebar-title">Pernambuco<br>com <span>Jones</span></h1>
+          <p class="sidebar-subtitle">Mapa interativo dos municípios que doaram para a vaquinha.</p>
+        </header>
+
+        <!-- Bloco de Destaque - Estatísticas -->
+        <section class="stats-card" aria-labelledby="stats-title">
+          <h2 id="stats-title" class="stats-label">Cidades Participantes</h2>
+          <div class="stats-number" id="stats-count">0</div>
+          <div class="stats-total-meta" id="stats-meta">0 de 185 cidades (0%)</div>
+          <div class="stats-percent-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+            <div class="stats-percent-fill" id="progress-fill"></div>
+          </div>
+        </section>
+
+        <!-- Barra de Busca -->
+        <section class="search-container" aria-label="Busca de Municípios">
+          <div class="search-input-wrapper">
+            <!-- Ícone de Lupa em SVG inline -->
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="search-input" class="search-input" placeholder="Buscar cidade..." autocomplete="off">
+          </div>
+          <!-- Menu do Autocomplete -->
+          <div class="search-results" id="search-results"></div>
+        </section>
+      </div>
+
+      <!-- Legenda e Logo na parte inferior da barra lateral -->
+      <div class="sidebar-bottom" style="margin-top: auto; display: flex; flex-direction: column; gap: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 1.5rem;">
+        <!-- Legenda do Mapa -->
+        <div class="legend">
+          <h3 class="legend-title" style="margin-bottom: 0.75rem;">Legenda</h3>
+          <div class="legend-items">
+            <div class="legend-item">
+              <span class="legend-color donated"></span>
+              <span>Cidade Doadora</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color remaining"></span>
+              <span>Ainda não demarcada</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rodapé com o Logo de Jones -->
+        <div class="logo-wrapper">
+          <img src="logo-jones.png" alt="Logo Jones Manoel" class="logo-image" onerror="this.style.display='none'; document.getElementById('logo-fallback-text').style.display='block';">
+          <div id="logo-fallback-text" class="logo-fallback" style="display: none;">
+            JONES <span>MANOEL</span>
+          </div>
+        </div>
+      </div>
+      
+    </aside>
+
+    <!-- ÁREA DO MAPA -->
+    <main id="map-container" class="map-canvas-container">
+      
+      <!-- Canvas SVG do D3.js -->
+      <svg id="map-svg" aria-label="Mapa Político Interativo de Pernambuco"></svg>
+      
+      <!-- Controles Flutuantes de Zoom -->
+      <div class="map-controls" role="group" aria-label="Controles do mapa">
+        <button id="zoom-in" class="control-btn" title="Aumentar Zoom" aria-label="Aumentar Zoom">+</button>
+        <button id="zoom-out" class="control-btn" title="Diminuir Zoom" aria-label="Diminuir Zoom">−</button>
+        <button id="zoom-reset" class="control-btn" title="Resetar Visualização" aria-label="Resetar Visualização">
+          <!-- Ícone de Home/Reset SVG -->
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Tooltip flutuante de informações -->
+      <div class="tooltip" id="map-tooltip" role="status" aria-live="polite"></div>
+
+
+
+      <!-- Gatilho do painel de administração (Discreto no canto inferior direito) -->
+      <button id="admin-trigger" class="admin-trigger" title="Acesso Restrito" aria-label="Acesso Restrito">
+        <!-- Ícone de Cadeado SVG -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </button>
+      
+    </main>
+
+  </div>
+
+  <!-- ==========================================================================
+       MODAL 1: AUTENTICAÇÃO PIN DO ADMINISTRADOR
+       ========================================================================== -->
+  <div class="modal-overlay" id="login-modal" aria-hidden="true" role="dialog" aria-labelledby="login-title">
+    <div class="modal-card">
+      <button class="modal-close-btn" id="close-login" aria-label="Fechar Modal">&times;</button>
+      
+      <h2 id="login-title" class="modal-title">Acesso <span>Restrito</span></h2>
+      <p class="modal-subtitle">Insira o código PIN de administrador para abrir o gerenciador de cidades.</p>
+      
+      <div class="pin-form-group">
+        <label for="pin-input" class="pin-label">PIN Administrativo</label>
+        <input type="password" id="pin-input" class="pin-input" placeholder="••••" maxlength="12">
+        <div id="pin-error" class="error-message">PIN incorreto. Tente novamente.</div>
+      </div>
+      
+      <button id="login-btn" class="btn-primary">Acessar Painel</button>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL 2: PAINEL DE CONTROLE ADMINISTRATIVO (GERENCIADOR)
+       ========================================================================== -->
+  <div class="modal-overlay" id="admin-modal" aria-hidden="true" role="dialog" aria-labelledby="admin-title">
+    <div class="modal-card admin-card">
+      <button class="modal-close-btn" id="close-admin" aria-label="Fechar Painel Administrativo">&times;</button>
+      
+      <h2 id="admin-title" class="modal-title">Gerenciador <span>do Mapa</span></h2>
+      <p class="modal-subtitle">Adicione ou remova cidades doadoras. As edições atualizam o mapa instantaneamente no seu navegador.</p>
+      
+      <div class="admin-grid">
+        <!-- Coluna Esquerda: Adicionar e Upload -->
+        <div class="admin-column">
+          
+          <!-- Adicionar Manual -->
+          <section class="admin-panel-section" aria-labelledby="section-manual">
+            <h3 id="section-manual" class="admin-section-title">Adicionar Cidade</h3>
+            <div class="admin-add-wrapper">
+              <input type="text" id="admin-city-input" class="admin-input" placeholder="Nome do município..." autocomplete="off">
+              <button id="admin-add-btn" class="btn-secondary">Adicionar</button>
+              
+              <!-- Autocomplete do input de Admin -->
+              <div class="admin-autocomplete-results" id="admin-autocomplete-results"></div>
+            </div>
+          </section>
+
+          <!-- Upload de Planilha -->
+          <section class="admin-panel-section" aria-labelledby="section-spreadsheet">
+            <h3 id="section-spreadsheet" class="admin-section-title">Importar Planilha</h3>
+            <div class="upload-zone" id="upload-zone">
+              <svg class="upload-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <div class="upload-text">Arraste a planilha ou clique para selecionar</div>
+              <div class="upload-subtext">Apenas arquivos formatados em .CSV</div>
+              <input type="file" id="csv-file" style="display: none;" accept=".csv">
+            </div>
+          </section>
+          
+        </div>
+
+        <!-- Coluna Direita: Cidades Cadastradas -->
+        <div class="admin-column">
+          <section class="admin-panel-section" aria-labelledby="section-active">
+            <h3 id="section-active" class="admin-section-title">Cidades Demarcadas</h3>
+            <!-- Lista com Rolagem -->
+            <div class="active-cities-list" id="active-cities-list"></div>
+          </section>
+        </div>
+      </div>
+
+      <!-- Rodapé do Admin: Sincronização com GitHub e Exportação manual -->
+      <footer class="admin-actions">
+        <!-- Integração Automatizada com o GitHub -->
+        <section class="admin-panel-section" aria-labelledby="section-github" style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.2rem; margin-bottom: 1rem;">
+          <h3 id="section-github" class="admin-section-title" style="color: var(--color-yellow); display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem;">
+            <!-- Ícone de Nuvem/Sincronização SVG -->
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.2 15c.7-1.2 1-2.5.7-3.9-.3-2-1.8-3.6-3.8-3.9C17 4.9 14 3 10.5 3.5c-2.5.4-4.5 2.2-5 4.7C3 9 2 11.2 2.5 13.5c.4 1.8 1.9 3.2 3.8 3.5H18c1.7 0 3.2-.8 4-2.2z"></path>
+              <polyline points="12 12 12 17"></polyline>
+              <polyline points="9 15 12 12 15 15"></polyline>
+            </svg>
+            Sincronizar Diretamente no GitHub
+          </h3>
+          <p style="font-size: 0.75rem; color: var(--color-gray-light); margin-bottom: 1rem; line-height: 1.4;">
+            Adicione suas credenciais do repositório abaixo para atualizar o site na nuvem com um clique, sem precisar baixar arquivos ou refazer o upload de planilhas.
+          </p>
+          
+          <div class="admin-grid" style="grid-template-columns: 1.2fr 1fr; gap: 1rem; margin-bottom: 0.8rem;">
+            <div>
+              <label for="github-token" class="pin-label" style="font-size: 0.7rem; margin-bottom: 0.3rem;">Token de Acesso (PAT)</label>
+              <input type="password" id="github-token" class="admin-input" placeholder="ghp_..." style="width: 100%; padding: 0.6rem 0.8rem; font-size: 0.8rem;">
+            </div>
+            <div>
+              <label for="github-repo" class="pin-label" style="font-size: 0.7rem; margin-bottom: 0.3rem;">Repositório (usuario/repositorio)</label>
+              <input type="text" id="github-repo" class="admin-input" placeholder="ex: gabif/pernambuco-com-jones" style="width: 100%; padding: 0.6rem 0.8rem; font-size: 0.8rem;">
+            </div>
+          </div>
+          <div class="admin-grid" style="grid-template-columns: 1fr 1.2fr; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <label for="github-branch" class="pin-label" style="font-size: 0.7rem; margin-bottom: 0.3rem;">Branch</label>
+              <input type="text" id="github-branch" class="admin-input" value="main" style="width: 100%; padding: 0.6rem 0.8rem; font-size: 0.8rem;">
+            </div>
+            <div style="display: flex; align-items: flex-end;">
+              <button id="github-save-btn" class="btn-primary" style="background-color: #2ea44f; color: white; border: none; padding: 0.65rem 1rem; font-size: 0.8rem; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                Publicar no GitHub
+              </button>
+            </div>
+          </div>
+          <div id="github-status" style="font-size: 0.75rem; text-align: center; font-weight: 600; padding: 0.5rem; border-radius: 4px; display: none;"></div>
+        </section>
+
+        <div class="admin-export-instruction">
+          <strong>Como alternativa manual:</strong> Clique em baixar para exportar o arquivo <code>data.js</code> e substitua-o no seu repositório local.
+        </div>
+        
+        <div class="admin-buttons-row">
+          <button id="admin-reset-btn" class="btn-danger" title="Restaurar dados padrões">Restaurar Padrões</button>
+          <button id="admin-export-btn" class="btn-primary" title="Baixar arquivo data.js atualizado">
+            <!-- Ícone de Download SVG -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Baixar data.js
+          </button>
+        </div>
+      </footer>
+      
+    </div>
+  </div>
+
+  <!-- Scripts do Aplicativo -->
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
