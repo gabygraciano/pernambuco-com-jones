@@ -28,6 +28,26 @@ function normalizeString(str) {
     .replace(/[^a-z0-9]/g, "") // Mantém apenas letras e números
     .trim();
 }
+// Obtém o nome oficial do município tratando grafias e erros de digitação comuns
+function getOfficialCityName(potentialCity) {
+  if (!potentialCity) return null;
+  const norm = normalizeString(potentialCity);
+  
+  // Dicionário de sinônimos/erros comuns de digitação de Pernambuco
+  const synonyms = {
+    "belemdosaofrancisco": "Belém de São Francisco",
+    "lagoadoitaenga": "Lagoa de Itaenga",
+    "iguaci": "Iguaracy",
+    "itamaraca": "Ilha de Itamaracá",
+    "ilhadeitamaraca": "Ilha de Itamaracá"
+  };
+  
+  if (synonyms[norm]) {
+    return synonyms[norm];
+  }
+  
+  return allMunicipalities.find((c) => normalizeString(c) === norm) || null;
+}
 
 // Inicialização do Aplicativo
 document.addEventListener("DOMContentLoaded", () => {
@@ -672,32 +692,33 @@ function processCsv(file) {
       const cleanLine = line.replace(/"/g, "").trim();
       if (!cleanLine) return;
 
-      // Restringe a análise apenas à primeira coluna do CSV
       const parts = cleanLine.split(/[,;]/);
-      if (parts.length > 0) {
-        const potentialCity = parts[0].trim();
-        if (!potentialCity) return;
+      
+      // Procura sequencialmente nas colunas da esquerda para a direita
+      // Adiciona apenas a primeira correspondência válida encontrada na linha
+      for (let i = 0; i < parts.length; i++) {
+        const potentialCity = parts[i].trim();
+        if (!potentialCity) continue;
 
-        // Pula o cabeçalho se ele contiver palavras identificadoras comuns
+        // Pula o cabeçalho se contiver termos identificadores
         if (index === 0 && (
           normalizeString(potentialCity) === "cidade" || 
           normalizeString(potentialCity) === "municipio" || 
           normalizeString(potentialCity) === "municipios" ||
           normalizeString(potentialCity) === "nome"
         )) {
-          return;
+          break; // Ignora o cabeçalho completamente
         }
 
-        // Procura correspondência na lista oficial de municípios de Pernambuco
-        const matchedCityName = allMunicipalities.find(
-          (c) => normalizeString(c) === normalizeString(potentialCity)
-        );
+        // Procura correspondência inteligente (incluindo sinônimos/erros comuns)
+        const matchedCityName = getOfficialCityName(potentialCity);
 
         if (matchedCityName) {
           if (!isCityDonated(matchedCityName)) {
             activeCities.push(matchedCityName);
             addedCount++;
           }
+          break; // Encontrou a cidade nesta linha, ignora as outras colunas para evitar duplicados
         }
       }
     });
@@ -707,7 +728,7 @@ function processCsv(file) {
       saveStateAndReload();
       alert(`Sucesso! ${addedCount} novas cidades válidas foram importadas e adicionadas ao mapa.`);
     } else {
-      alert("Nenhuma cidade nova foi importada. Certifique-se de que a primeira coluna da planilha possui nomes oficiais de municípios de Pernambuco.");
+      alert("Nenhuma cidade nova foi importada. Certifique-se de que a planilha possui nomes de municípios de Pernambuco.");
     }
     
     // Limpa o input de arquivo para permitir novos uploads do mesmo arquivo
