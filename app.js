@@ -39,7 +39,9 @@ function getOfficialCityName(potentialCity) {
     "lagoadoitaenga": "Lagoa de Itaenga",
     "iguaci": "Iguaracy",
     "itamaraca": "Ilha de Itamaracá",
-    "ilhadeitamaraca": "Ilha de Itamaracá"
+    "ilhadeitamaraca": "Ilha de Itamaracá",
+    "garanhus": "Garanhuns",
+    "saocaetano": "São Caitano"
   };
   
   if (synonyms[norm]) {
