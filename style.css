@@ -269,13 +269,13 @@ body {
 }
 
 .search-result-item .city-status.donated {
-  background: rgba(252, 198, 67, 0.2);
-  color: var(--color-yellow);
+  background: rgba(230, 51, 55, 0.2);
+  color: var(--color-red);
 }
 
 .search-result-item .city-status.pending {
-  background: rgba(230, 51, 55, 0.2);
-  color: var(--color-red);
+  background: rgba(252, 198, 67, 0.2);
+  color: var(--color-yellow);
 }
 
 /* Legenda do Mapa */
@@ -321,11 +321,11 @@ body {
 }
 
 .legend-color.donated {
-  background-color: var(--color-yellow);
+  background-color: var(--color-red);
 }
 
 .legend-color.remaining {
-  background-color: var(--color-red);
+  background-color: var(--color-yellow);
 }
 
 /* ==========================================================================
@@ -361,14 +361,19 @@ body {
 
 /* Estilo dos Municípios no SVG */
 .municipality {
-  fill: var(--color-red);
+  fill: var(--color-yellow);
   stroke: var(--color-blue);
   stroke-width: 0.5px;
   transition: fill 0.3s ease, stroke-width 0.2s ease, filter 0.2s ease;
 }
 
 .municipality.donated-city {
-  fill: var(--color-yellow);
+  fill: var(--color-red);
+}
+
+/* Ícone de Caranguejo */
+.crab-icon {
+  pointer-events: none;
 }
 
 .municipality:hover {
@@ -455,20 +460,20 @@ body {
 }
 
 .tooltip-status.donated {
-  color: var(--color-yellow);
+  color: var(--color-red);
 }
 
 .tooltip-status.donated .badge {
-  background-color: var(--color-yellow);
-  box-shadow: 0 0 8px var(--color-yellow);
+  background-color: var(--color-red);
+  box-shadow: 0 0 8px var(--color-red);
 }
 
 .tooltip-status.pending {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-yellow);
 }
 
 .tooltip-status.pending .badge {
-  background-color: var(--color-red);
+  background-color: var(--color-yellow);
 }
 
 /* Animação Pulsar para Cidades Localizadas */

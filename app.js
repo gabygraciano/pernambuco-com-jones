@@ -168,6 +168,20 @@ function renderMap(geojson) {
     .translateExtent([[0, 0], [width, height]])
     .on("zoom", (event) => {
       g.attr("transform", event.transform);
+      
+      // Ajusta o tamanho e offset dos caranguejos inversamente ao zoom para manter tamanho constante
+      const scale = event.transform.k;
+      g.selectAll(".crab-icon")
+        .attr("width", 24 / scale)
+        .attr("height", 24 / scale)
+        .attr("x", d => {
+          const centroid = pathGenerator.centroid(d);
+          return centroid[0] - (12 / scale);
+        })
+        .attr("y", d => {
+          const centroid = pathGenerator.centroid(d);
+          return centroid[1] - (12 / scale);
+        });
     });
 
   svg.call(zoom);
@@ -182,6 +196,9 @@ function renderMap(geojson) {
   d3.select("#zoom-reset").on("click", () => {
     svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity);
   });
+
+  // Renderiza os caranguejos inicialmente
+  updateCrabIcons(projection);
 }
 
 // Verifica se uma cidade está marcada como doadora
@@ -747,6 +764,16 @@ function saveStateAndReload() {
   // Atualiza as cores do mapa sem redesenhar toda a estrutura SVG
   g.selectAll(".municipality")
     .classed("donated-city", (d) => isCityDonated(d.properties.name));
+
+  // Atualiza a posição dos caranguejos com base nas novas cidades
+  if (geojsonData) {
+    const continenteFeatures = geojsonData.features.filter(
+      (f) => normalizeString(f.properties.name) !== "fernandodenoronha"
+    );
+    const continenteGeojson = { type: "FeatureCollection", features: continenteFeatures };
+    const projection = d3.geoMercator().fitSize([width - 40, height - 40], continenteGeojson);
+    updateCrabIcons(projection);
+  }
 }
 
 // Gera e exporta o arquivo data.js atualizado
@@ -771,4 +798,45 @@ const cidadesDoadorasIniciais = ${JSON.stringify(activeCities, null, 2)};
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// Renderiza e atualiza os ícones de caranguejo nas cidades demarcadas
+function updateCrabIcons(projection) {
+  if (!geojsonData) return;
+  const pathGenerator = d3.geoPath().projection(projection);
+  
+  // Filtra apenas as cidades doadoras
+  const donatedFeatures = geojsonData.features.filter((d) => isCityDonated(d.properties.name));
+  
+  // Realiza o data binding dos ícones
+  const crabs = g.selectAll(".crab-icon")
+    .data(donatedFeatures, (d) => d.properties.name);
+    
+  // Remove caranguejos de cidades desmarcadas
+  crabs.exit().remove();
+  
+  // Adiciona novos ícones para novas cidades
+  const enterCrabs = crabs.enter()
+    .append("image")
+    .attr("class", "crab-icon")
+    .attr("xlink:href", "crab.png")
+    .attr("pointer-events", "none"); // repassa os cliques para o path do mapa abaixo
+    
+  // Mescla novos e existentes e posiciona com compensação de zoom
+  const allCrabs = enterCrabs.merge(crabs);
+  
+  const transform = d3.zoomTransform(svg.node());
+  const scale = transform.k;
+  
+  allCrabs
+    .attr("width", 24 / scale)
+    .attr("height", 24 / scale)
+    .attr("x", (d) => {
+      const centroid = pathGenerator.centroid(d);
+      return centroid[0] - (12 / scale);
+    })
+    .attr("y", (d) => {
+      const centroid = pathGenerator.centroid(d);
+      return centroid[1] - (12 / scale);
+    });
 }
